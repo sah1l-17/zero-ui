@@ -1,0 +1,15 @@
+sentence-transformers
+faiss-cpu
+pandas
+numpy
+groq
+openpyxl
+torch
+transformers
+tqdm
+scikit-learn
+openai-whisper
+sounddevice
+soundfile
+TTS
+python-dotenv
