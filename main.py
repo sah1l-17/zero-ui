@@ -1363,5 +1363,129 @@ def run_chatbot():
         print(f"\nBot: {result['reply']}\n")
 
 
+
+# ========================================
+# 🎤 Voice Chatbot Loop
+# ========================================
+
+def _strip_markdown(text: str) -> str:
+    """Remove markdown formatting for cleaner TTS output."""
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)   # **bold**
+    text = re.sub(r'\*(.+?)\*', r'\1', text)        # *italic*
+    text = re.sub(r'__(.+?)__', r'\1', text)        # __bold__
+    text = re.sub(r'_(.+?)_', r'\1', text)          # _italic_
+    text = re.sub(r'#+\s*', '', text)               # # headers
+    text = re.sub(r'\[(.+?)\]\(.+?\)', r'\1', text) # [link](url)
+    text = re.sub(r'`(.+?)`', r'\1', text)          # `code`
+    return text.strip()
+
+
+def run_voice_chatbot():
+    """Interactive voice chatbot — mirrors run_chatbot() but uses STT/TTS."""
+    from voice_assistant import VoiceAssistant
+
+    print("\n🎤 Voice Chatbot Starting...\n")
+
+    va = VoiceAssistant()
+
+    session = {
+        "state": "greeting",
+        "flow": None,
+        "data": {},
+        "token": None,
+        "username": None,
+        "authenticated": False,
+        "conversation_history": [],
+        "last_search_results": None,
+        "last_category": None,
+    }
+
+    def say(text):
+        """Speak text via TTS with interrupt support (strips markdown first)."""
+        print(f"Bot: {text}")
+        clean = _strip_markdown(text)
+        # Replace newlines with pauses for natural speech
+        clean = re.sub(r'\n+', '. ', clean)
+        clean = re.sub(r'\s+', ' ', clean).strip()
+        if clean:
+            done, reason = va.speak_sentences(clean)
+            if not done:
+                print("⚠️ Speech interrupted by user")
+
+    def listen():
+        """Listen for speech and return text, or None."""
+        text, _ = va.listen_for_speech()
+        if text:
+            print(f"You: {text}")
+        return text
+
+    # Generate initial greeting
+    greeting = groq_chat(
+        "You are a friendly e-commerce shopping assistant chatbot. "
+        "The user has just connected for the first time. "
+        "Greet them warmly and ask whether they would like to login or signup. "
+        "Keep it brief, professional, and friendly. Ask only ONE question. "
+        "Do not use bullet points or numbered lists."
+    )
+    session["state"] = "choosing"
+    say(greeting)
+
+    try:
+        while True:
+            user_input = listen()
+
+            if not user_input:
+                say("I didn't catch that. Could you please repeat?")
+                continue
+
+            if user_input.lower() in ("exit", "quit", "bye", "goodbye"):
+                say("Goodbye! Have a great day!")
+                break
+
+            # ── Authenticated: route through intent detection ──
+            if session.get("authenticated") and session.get("username"):
+                result = handle_authenticated_chat(
+                    session, session["username"], user_input
+                )
+                say(result["reply"])
+
+                # Handle logout → reset session
+                if result.get("logout"):
+                    session.update({
+                        "state": "greeting",
+                        "flow": None,
+                        "data": {},
+                        "token": None,
+                        "username": None,
+                        "authenticated": False,
+                        "conversation_history": [],
+                        "last_search_results": None,
+                        "last_category": None,
+                    })
+                    greeting = groq_chat(
+                        "You are a friendly e-commerce shopping assistant chatbot. "
+                        "The user has just logged out and is back to the start. "
+                        "Greet them and ask whether they would like to login or signup. "
+                        "Keep it brief, professional, and friendly. Ask only ONE question."
+                    )
+                    session["state"] = "choosing"
+                    say(greeting)
+                continue
+
+            # ── Not authenticated: drive auth flow ──
+            result = handle_auth_flow(session, user_input)
+            say(result["reply"])
+
+    except KeyboardInterrupt:
+        print("\n🛑 Interrupted by user")
+    finally:
+        va.cleanup()
+        print("🧹 Voice session ended.")
+
+
 if __name__ == "__main__":
-    run_chatbot()
+    import sys
+    if "--voice" in sys.argv:
+        run_voice_chatbot()
+    else:
+        run_chatbot()
