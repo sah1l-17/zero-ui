@@ -1383,8 +1383,18 @@ def _strip_markdown(text: str) -> str:
 def run_voice_chatbot():
     """Interactive voice chatbot — mirrors run_chatbot() but uses STT/TTS."""
     from voice_assistant import VoiceAssistant
+    from ui_server import AssistantUIServer
+    from ui_state import AssistantUIStateStore
 
     print("\n🎤 Voice Chatbot Starting...\n")
+
+    # ── Start UI server for frontend ──
+    ui_port = int(os.getenv("UI_PORT", "8000"))
+    ui_server = AssistantUIServer(host="127.0.0.1", port=ui_port)
+    ui_state = AssistantUIStateStore(on_change=ui_server.schedule_broadcast)
+    ui_server.attach_store(ui_state)
+    ui_server.start()
+    ui_state.set(text="Starting assistant…", speaking=False)
 
     va = VoiceAssistant()
 
@@ -1408,12 +1418,15 @@ def run_voice_chatbot():
         clean = re.sub(r'\n+', '. ', clean)
         clean = re.sub(r'\s+', ' ', clean).strip()
         if clean:
+            ui_state.set(text=clean, speaking=True)
             done, reason = va.speak_sentences(clean)
+            ui_state.set(speaking=False)
             if not done:
                 print("⚠️ Speech interrupted by user")
 
     def listen():
         """Listen for speech and return text, or None."""
+        ui_state.set(text="Listening…", speaking=False)
         text, _ = va.listen_for_speech()
         if text:
             print(f"You: {text}")
@@ -1444,6 +1457,7 @@ def run_voice_chatbot():
 
             # ── Authenticated: route through intent detection ──
             if session.get("authenticated") and session.get("username"):
+                ui_state.set(text="Thinking…", speaking=False)
                 result = handle_authenticated_chat(
                     session, session["username"], user_input
                 )
@@ -1480,6 +1494,7 @@ def run_voice_chatbot():
         print("\n🛑 Interrupted by user")
     finally:
         va.cleanup()
+        ui_server.stop()
         print("🧹 Voice session ended.")
 
 
