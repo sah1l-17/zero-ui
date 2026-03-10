@@ -10,7 +10,7 @@ export default function App() {
     <main className="shell">
       <section className="center">
         <OrbStage speaking={state.speaking} />
-        <AssistantLine text={state.text || (state.speaking ? 'Speaking…' : 'Listening…')} />
+        <AssistantLine text={state.text || (state.speaking ? 'Speaking…' : 'Starting assistant…')} />
         <div className="transport" aria-hidden="true">
           {transport === 'ws' ? 'Connected' : transport === 'polling' ? 'Syncing' : 'Connecting'}
         </div>

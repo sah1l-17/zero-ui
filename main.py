@@ -1418,8 +1418,11 @@ def run_voice_chatbot():
         clean = re.sub(r'\n+', '. ', clean)
         clean = re.sub(r'\s+', ' ', clean).strip()
         if clean:
-            ui_state.set(text=clean, speaking=True)
-            done, reason = va.speak_sentences(clean)
+            ui_state.set(speaking=True)
+            done, reason = va.speak_sentences(
+                clean,
+                on_sentence=lambda s: ui_state.set(text=s, speaking=True),
+            )
             ui_state.set(speaking=False)
             if not done:
                 print("⚠️ Speech interrupted by user")

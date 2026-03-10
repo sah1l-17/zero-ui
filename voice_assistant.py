@@ -42,7 +42,12 @@ except Exception:
 # ==============================================
 
 class PorcupineInterruptListener:
-    """Listens for wake/interrupt keywords during TTS playback."""
+    """Reusable listener for wake/interrupt keywords during TTS playback.
+
+    Create once, call start()/stop() per utterance, destroy() on shutdown.
+    The PyAudio stream is opened/closed in start()/stop() to avoid
+    conflicting with SpeechRecognition's microphone on macOS.
+    """
 
     def __init__(self, keywords=("computer", "terminator")):
         if not PV_AVAILABLE:
@@ -58,8 +63,19 @@ class PorcupineInterruptListener:
             keywords=self.keywords,
         )
 
-        self.pa = pyaudio.PyAudio()
+        self.pa = None
+        self.stream = None
 
+        self.interrupted = threading.Event()
+        self._running = threading.Event()
+        self._ready = threading.Event()
+        self._thread = None
+
+    # ---- internal helpers ------------------------------------------------
+
+    def _open_stream(self):
+        """Open a fresh PyAudio input stream."""
+        self.pa = pyaudio.PyAudio()
         self.stream = self.pa.open(
             rate=self.pp.sample_rate,
             channels=1,
@@ -68,13 +84,39 @@ class PorcupineInterruptListener:
             frames_per_buffer=self.pp.frame_length,
         )
 
-        self.interrupted = threading.Event()
-        self._running = threading.Event()
-        self._thread = None
+    def _close_stream(self):
+        """Close the PyAudio stream so it doesn't conflict with other mic users."""
+        try:
+            if self.stream:
+                self.stream.stop_stream()
+                self.stream.close()
+        except Exception:
+            pass
+        self.stream = None
+
+        try:
+            if self.pa:
+                self.pa.terminate()
+        except Exception:
+            pass
+        self.pa = None
+
+    def _drain_buffer(self):
+        """Read and discard any stale frames sitting in the OS audio buffer."""
+        try:
+            avail = self.stream.get_read_available()
+            while avail >= self.pp.frame_length:
+                self.stream.read(self.pp.frame_length, exception_on_overflow=False)
+                avail = self.stream.get_read_available()
+        except Exception:
+            pass
 
     # ---- internal loop ---------------------------------------------------
 
     def _loop(self):
+        self._drain_buffer()
+        self._ready.set()
+
         while self._running.is_set() and not self.interrupted.is_set():
             try:
                 pcm_data = self.stream.read(
@@ -93,25 +135,27 @@ class PorcupineInterruptListener:
     # ---- public API ------------------------------------------------------
 
     def start(self):
+        """Open mic stream and begin listening. Blocks until ready."""
+        self.interrupted.clear()
+        self._ready.clear()
+        self._open_stream()
         self._running.set()
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
+        # Wait until buffer is drained and loop is actively reading
+        self._ready.wait(timeout=1.0)
 
     def stop(self):
+        """Stop the listening loop and release the mic stream."""
         self._running.clear()
         if self._thread:
             self._thread.join(timeout=1)
+            self._thread = None
+        self._close_stream()
 
-        try:
-            self.stream.stop_stream()
-            self.stream.close()
-        except Exception:
-            pass
-
-        try:
-            self.pa.terminate()
-        except Exception:
-            pass
+    def destroy(self):
+        """Fully release Porcupine engine and any remaining resources."""
+        self.stop()
 
         try:
             self.pp.delete()
@@ -137,6 +181,17 @@ class VoiceAssistant:
         self.temp_audio_file = os.path.join(self._temp_dir, "temp_response.mp3")
 
         self.interrupt_keywords = ["computer", "terminator"]
+        self._clock = pygame.time.Clock()
+
+        # Create a persistent interrupt listener (reused across all utterances)
+        self._listener = None
+        if PV_AVAILABLE:
+            try:
+                self._listener = PorcupineInterruptListener(
+                    keywords=tuple(self.interrupt_keywords)
+                )
+            except Exception as e:
+                print(f"⚠️  Interrupt listener unavailable: {e}")
 
         self.adjust_for_ambient_noise()
         print("✅ Voice Assistant initialized")
@@ -190,7 +245,7 @@ class VoiceAssistant:
 
     async def generate_speech_async(self, text, voice="en-US-AriaNeural"):
         try:
-            await edge_tts.Communicate(text, voice).save(self.temp_audio_file)
+            await edge_tts.Communicate(text, voice, rate="+17%").save(self.temp_audio_file)
             return True
         except Exception as e:
             print(f"❌ TTS error: {e}")
@@ -217,29 +272,26 @@ class VoiceAssistant:
             print(f"❌ Failed loading audio: {e}")
             return False
 
-        listener = None
-        if PV_AVAILABLE:
+        # Start the persistent listener (drains buffer + waits until ready)
+        if self._listener:
             try:
-                listener = PorcupineInterruptListener(
-                    keywords=tuple(self.interrupt_keywords)
-                )
-                listener.start()
+                self._listener.start()
             except Exception as e:
                 print(f"❌ Porcupine error: {e}")
 
         pygame.mixer.music.play()
 
         while pygame.mixer.music.get_busy():
-            if listener and listener.was_interrupted():
+            if self._listener and self._listener.was_interrupted():
                 pygame.mixer.music.stop()
                 pygame.mixer.music.unload()
-                listener.stop()
+                self._listener.stop()
                 return False
 
-            pygame.time.Clock().tick(50)
+            self._clock.tick(50)
 
-        if listener:
-            listener.stop()
+        if self._listener:
+            self._listener.stop()
 
         try:
             pygame.mixer.music.unload()
@@ -277,10 +329,15 @@ class VoiceAssistant:
     # SPEAK SENTENCES (sentence-by-sentence with interrupt)
     # ------------------------------------------------------------------
 
-    def speak_sentences(self, text):
+    def speak_sentences(self, text, on_sentence=None):
         """
         Split *text* at sentence boundaries and speak each sentence.
         Stops immediately if the user interrupts any sentence.
+
+        Parameters
+        ----------
+        on_sentence : callable, optional
+            Called with the sentence text just before it is spoken.
 
         Returns
         -------
@@ -291,6 +348,8 @@ class VoiceAssistant:
         sentences = [s.strip() for s in sentences if s.strip()]
 
         for s in sentences:
+            if on_sentence:
+                on_sentence(s)
             done, reason = self.speak_with_interrupt(s)
             if not done:
                 return False, reason
@@ -302,6 +361,10 @@ class VoiceAssistant:
 
     def cleanup(self):
         """Release audio resources and remove temp files."""
+        if self._listener:
+            self._listener.destroy()
+            self._listener = None
+
         try:
             pygame.mixer.music.stop()
             pygame.mixer.music.unload()
