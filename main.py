@@ -716,6 +716,26 @@ def override_intent_by_keywords(query: str, session: dict) -> str | None:
         return "cart_detail"
 
     # ── Order intents ──
+    # order_details: explicit order ID (ORD-XXXXXXXX)
+    if re.search(r"\bORD-[A-Z0-9]{8}\b", q, re.IGNORECASE):
+        return "order_details"
+    # order_details: "this order", "that order", "the order" (context-based follow-up)
+    if re.search(r"\b(?:this|that|the)\s+order\b", q):
+        return "order_details"
+    # order_details: "items in the order", "items of the order" (context-based)
+    if re.search(r"\b(?:items?|products?|price|total|status|details?)\s+(?:in|of|for)\s+(?:the|this|that)\s+order\b", q):
+        return "order_details"
+    # order_details: queries about specific order info (price, items, status, etc.)
+    if re.search(r"\b(?:what|how\s+much|show|tell|get|check)\b.*\b(?:price|cost|total|items?|products?|details?|status|shipping|address)\b.*\b(?:order|purchase)\b", q):
+        return "order_details"
+    if re.search(r"\b(?:price|cost|total|items?|products?|details?|status)\b.*\b(?:of|for|in)\b.*\b(?:my|the|first|second|third|fourth|fifth|last)\b.*\b(?:order|purchase)\b", q):
+        return "order_details"
+    if re.search(r"\bwhat\s+(?:was|is|are)\b.*\b(?:in|of)\b.*\b(?:my|the)\b.*\border\b", q):
+        return "order_details"
+    if re.search(r"\b(?:first|second|third|fourth|fifth|last)\s+order\b.*\b(?:price|items?|total|details?|status|products?)\b", q):
+        return "order_details"
+    if re.search(r"\border\s+details\b", q):
+        return "order_details"
     if re.search(r"\b(?:place|confirm|finalize|complete|proceed)\b.*\b(?:order|purchase|checkout|payment)\b", q):
         return "place_order"
     if re.search(r"\b(?:checkout|place\s+order|confirm\s+order)\b", q):
@@ -1115,8 +1135,8 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
         history.append({"role": "assistant", "content": reply})
         return {"reply": reply, "data": {"intent": intent, "cart_result": result_data}}
 
-    # ── order intents (place_order, cancel_order, order_history) ──
-    order_intents = ["place_order", "cancel_order", "order_history"]
+    # ── order intents (place_order, cancel_order, order_history, order_details) ──
+    order_intents = ["place_order", "cancel_order", "order_history", "order_details"]
     if intent in order_intents:
 
         # ── place_order: show preview + ask for confirmation first ──
@@ -1194,6 +1214,66 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
                 history.append({"role": "user", "content": message})
                 history.append({"role": "assistant", "content": reply})
                 return {"reply": reply, "data": {"intent": "cancel_order", "order_result": preview_data}}
+
+        # ── order_details: show specific order information ──
+        if intent == "order_details":
+            # First ensure we have the order list in session
+            if not session.get("last_order_list"):
+                # Fetch order history first to populate the list
+                history_result = order_manager_agent(
+                    intent="order_history",
+                    query=message,
+                    username=username,
+                )
+                order_list = history_result.get("result", {}).get("orders", [])
+                if order_list:
+                    session["last_order_list"] = order_list
+
+            # Resolve the order ID from query (ordinals or explicit ID)
+            resolved_id = _resolve_order_id_from_query(message, session)
+
+            # Fall back to last discussed order if no specific order referenced
+            if not resolved_id:
+                resolved_id = session.get("last_discussed_order_id")
+
+            if not resolved_id:
+                # No specific order referenced and no context - ask user to specify
+                reply = "Which order would you like details for? You can say 'first order', 'second order', 'last order', or provide the order ID."
+                history.append({"role": "user", "content": message})
+                history.append({"role": "assistant", "content": reply})
+                return {"reply": reply, "data": {"intent": "order_details", "order_result": {"status": "need_order_id"}}}
+
+            agent_result = order_manager_agent(
+                intent="order_details",
+                query=message,
+                username=username,
+                order_id=resolved_id,
+            )
+            result_data = agent_result.get("result", {})
+
+            if result_data.get("status") == "ok":
+                # Store the order ID for follow-up context
+                session["last_discussed_order_id"] = result_data.get("order_id")
+
+                # Build programmatic order details display
+                items_text = "\n".join(
+                    f"  {i}. **{item['name']}** — Qty: {item['quantity']}, {item['unit_price']} (Subtotal: {item['subtotal']})"
+                    for i, item in enumerate(result_data.get("items", []), 1)
+                )
+                reply = (
+                    f"**Order Details: {result_data.get('order_id', 'N/A')}**\n\n"
+                    f"**Items:**\n{items_text}\n\n"
+                    f"**Total:** {result_data.get('total_amount', 'N/A')}\n"
+                    f"**Status:** {result_data.get('order_status', 'unknown').title()}\n"
+                    f"**Order Date:** {result_data.get('created_at', 'N/A')[:10]}\n"
+                    f"**Shipping to:** {result_data.get('shipping_address', 'N/A')}"
+                )
+            else:
+                reply = result_data.get("message", "Could not retrieve order details.")
+
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": reply})
+            return {"reply": reply, "data": {"intent": "order_details", "order_result": result_data}}
 
         # ── order_history ──
         agent_result = order_manager_agent(

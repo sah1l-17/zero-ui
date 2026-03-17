@@ -64,6 +64,16 @@ _ORDER_HISTORY_PHRASES = (
     r"purchase\s+history|order\s+list|all\s+orders?)\b"
 )
 
+_ORDER_DETAILS_PHRASES = (
+    r"\b(order\s+details?|details?\s+of\s+(?:my\s+)?order|"
+    r"what\s+(?:was|is|are)\s+(?:in|of)\s+(?:my\s+)?(?:the\s+)?(?:first|second|third|fourth|fifth|last)?\s*order|"
+    r"(?:price|cost|total|items?|products?|status|shipping)\s+(?:of|for|in)\s+(?:my\s+)?(?:the\s+)?order|"
+    r"how\s+much\s+(?:was|is)\s+(?:my\s+)?order|"
+    r"(?:first|second|third|fourth|fifth|last)\s+order\s+(?:price|details?|items?|total|status)|"
+    r"ORD-[A-Z0-9]{8}|"
+    r"(?:this|that)\s+order)\b"
+)
+
 
 # ─────────────────────────────────────────────────
 # Quantity extraction
@@ -213,7 +223,12 @@ def resolve_intent_by_entities(query: str) -> Optional[str]:
     has_order_cancel = bool(re.search(_ORDER_CANCEL_VERBS, q))
     has_order_noun = bool(re.search(_ORDER_NOUNS, q))
     has_order_history = bool(re.search(_ORDER_HISTORY_PHRASES, q))
+    has_order_details = bool(re.search(_ORDER_DETAILS_PHRASES, q))
 
+    # order_details must be checked BEFORE cancel_order
+    # because queries like "price of my order" should not trigger cancel
+    if has_order_details and not has_order_cancel:
+        return "order_details"
     # cancel_order must be checked BEFORE order_history
     # because "cancel my order" matches both _ORDER_CANCEL_VERBS and _ORDER_HISTORY_PHRASES
     if has_order_cancel and has_order_noun:

@@ -358,6 +358,59 @@ def get_order_history(username: str) -> dict:
     }
 
 
+def get_order_details(username: str, order_id: str) -> dict:
+    """
+    Fetch detailed information for a specific order.
+    Returns all order details including items, prices, status, dates, and shipping.
+    """
+    order = orders_collection.find_one({"order_id": order_id})
+
+    if order is None:
+        return {
+            "status": "not_found",
+            "order_id": order_id,
+            "message": f"Order '{order_id}' was not found.",
+        }
+
+    # Ownership check
+    if order["username"] != username:
+        return {
+            "status": "unauthorized",
+            "order_id": order_id,
+            "message": "You are not authorized to view this order.",
+        }
+
+    # Build detailed response
+    items = order.get("items", [])
+    item_summaries = []
+    for item in items:
+        name = item.get("product_id", "Unknown")
+        qty = item.get("quantity", 1)
+        price = _extract_price(item.get("product_data", {}))
+        item_summaries.append({
+            "name": name,
+            "quantity": qty,
+            "unit_price": f"₹{price:,.2f}",
+            "subtotal": f"₹{price * qty:,.2f}",
+        })
+
+    return {
+        "status": "ok",
+        "order_id": order_id,
+        "items": item_summaries,
+        "item_count": len(items),
+        "total_amount": f"₹{order.get('total_amount', 0):,.2f}",
+        "shipping_address": order.get("shipping_address", ""),
+        "order_status": order.get("status", "unknown"),
+        "created_at": order["created_at"].isoformat() if isinstance(order["created_at"], datetime) else str(order["created_at"]),
+        "message": (
+            f"Order {order_id}: {len(items)} item(s), "
+            f"Total: ₹{order.get('total_amount', 0):,.2f}, "
+            f"Status: {order.get('status', 'unknown').title()}"
+        ),
+    }
+
+
 def preview_cancel_order(username: str, order_id: str) -> dict:
     """
     Fetch the order details for a cancellation preview WITHOUT actually cancelling.
@@ -511,6 +564,23 @@ def order_manager_agent(intent: str, query: str, username: str, order_id: str | 
     if intent == "order_history":
         result = get_order_history(username)
         return {"action": "order_history", "result": result}
+
+    # ── order_details ──────────────────────────────────────
+    if intent == "order_details":
+        if not order_id:
+            oid = extract_order_id_from_query(query)
+            if not oid:
+                # No order ID provided — caller should resolve from session
+                return {
+                    "action": "order_details",
+                    "result": {
+                        "status": "need_order_id",
+                        "message": "Please specify which order you'd like details for.",
+                    },
+                }
+            order_id = oid
+        result = get_order_details(username, order_id)
+        return {"action": "order_details", "result": result}
 
     # ── unknown ─────────────────────────────────────────────
     return {

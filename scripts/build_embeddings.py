@@ -115,7 +115,7 @@ def build_embeddings():
     
     # Columns already normalized per-sheet; drop any remaining dupes
     df = df.loc[:, ~df.columns.duplicated()]
-    df = df.applymap(lambda x: str(x).strip().lower())
+    df = df.map(lambda x: str(x).strip().lower())
     
     if "product type" not in df.columns:
         raise ValueError("Column 'product type' not found in Excel.")
