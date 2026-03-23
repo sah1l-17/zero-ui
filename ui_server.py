@@ -80,7 +80,7 @@ class AssistantUIServer:
 
         self._thread = threading.Thread(target=_serve, daemon=True)
         self._thread.start()
-        print(f"🌐 UI server running on http://{self._host}:{self._port}")
+        print(f"UI server running on http://{self._host}:{self._port}")
 
     def stop(self) -> None:
         if not self._httpd:

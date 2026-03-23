@@ -23,7 +23,7 @@ users_collection.create_index("username", unique=True)
 
 
 # ========================================
-# 🔍 Validation Helpers
+# Validation Helpers
 # ========================================
 
 def validate_email(email: str) -> bool:
@@ -42,7 +42,7 @@ def validate_phone(phone: str) -> bool:
 
 
 # ========================================
-# 🔧 Query Parsing
+# Query Parsing
 # ========================================
 
 # Field aliases that map natural language tokens to canonical field names
@@ -139,7 +139,7 @@ def extract_profile_updates(query: str) -> dict:
 
 
 # ========================================
-# 👤 Profile CRUD Operations
+# Profile CRUD Operations
 # ========================================
 
 def view_profile(username: str) -> dict:
@@ -255,7 +255,7 @@ def update_profile(username: str, updates: dict) -> dict:
 
 
 # ========================================
-# 🧩 Profile Manager Agent (entry point)
+# Profile Manager Agent (entry point)
 # ========================================
 
 def profile_manager_agent(intent: str, query: str, username: str) -> dict:

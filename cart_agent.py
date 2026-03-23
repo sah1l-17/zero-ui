@@ -23,7 +23,7 @@ carts_collection.create_index("username", unique=True)
 
 
 # ========================================
-# 🛒 Cart CRUD Operations
+# Cart CRUD Operations
 # ========================================
 
 def add_to_cart(username: str, product_row: dict, quantity: int = 1) -> dict:
@@ -205,7 +205,7 @@ def update_cart(username: str, product_id: str, quantity: int) -> dict:
 
 
 # ========================================
-# 🔍 Helpers
+# Helpers
 # ========================================
 
 def _product_id_from_row(product_row: dict) -> str:
@@ -233,12 +233,12 @@ def extract_quantity(text: str) -> int:
     """
     Extract a numeric quantity from natural language.
     Examples:
-      "make it 3"                  → 3
-      "set quantity to 2"          → 2
-      "increase to 5"              → 5
-      "add 4 of these"             → 4
-      "increase by one"            → 1
-      "change quantity to three"   → 3
+      "make it 3" → 3
+      "set quantity to 2" → 2
+      "increase to 5" → 5
+      "add 4 of these" → 4
+      "increase by one" → 1
+      "change quantity to three" → 3
     Falls back to 1 if nothing found.
     """
     q = text.lower()
@@ -276,12 +276,12 @@ def is_relative_change(text: str) -> bool:
     vs an *absolute* change (set/change TO N).
 
     Examples:
-      "increase quantity by one"      → True   (add 1 to current)
-      "decrease quantity by 2"         → True   (subtract 2 from current)
-      "set quantity to 3"             → False  (set to exactly 3)
-      "change quantity to 5"          → False  (set to exactly 5)
-      "make it 2"                     → False  (set to exactly 2)
-      "increase quantity to 3"        → False  (set to exactly 3)
+      "increase quantity by one" → True (add 1 to current)
+      "decrease quantity by 2" → True (subtract 2 from current)
+      "set quantity to 3" → False (set to exactly 3)
+      "change quantity to 5" → False (set to exactly 5)
+      "make it 2" → False (set to exactly 2)
+      "increase quantity to 3" → False (set to exactly 3)
     """
     q = text.lower().strip()
 
@@ -376,7 +376,7 @@ def find_cart_item_by_query(username: str, query: str) -> str | None:
 
 
 # ========================================
-# 🔗 Pronoun / Ordinal Reference Resolution
+# Pronoun / Ordinal Reference Resolution
 # ========================================
 
 def resolve_product_reference(query: str, search_results: list,
@@ -418,7 +418,7 @@ def resolve_product_reference(query: str, search_results: list,
 
 
 # ========================================
-# 🧩 Cart Manager Agent (entry point)
+# Cart Manager Agent (entry point)
 # ========================================
 
 def cart_manager_agent(intent: str, query: str, username: str,

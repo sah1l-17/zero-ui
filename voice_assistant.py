@@ -3,7 +3,7 @@ voice_assistant.py — Voice Assistant Module with reliable interrupt support.
 
 Provides:
   - PorcupineInterruptListener : wake-word / interrupt detection during playback
-  - VoiceAssistant             : STT (Google via SpeechRecognition),
+  - VoiceAssistant : STT (Google via SpeechRecognition),
                                   TTS (Edge-TTS), and interruptible playback
 
 Uses Porcupine (pvporcupine) + pyaudio for low-latency keyword detection.
@@ -33,12 +33,12 @@ try:
     PV_AVAILABLE = True
 except Exception:
     PV_AVAILABLE = False
-    print("⚠️  Porcupine unavailable – interrupt detection disabled. "
+    print("Porcupine unavailable - interrupt detection disabled. "
           "Install via: pip install pvporcupine pyaudio")
 
 
 # ==============================================
-#  INTERRUPT LISTENER (Porcupine-based)
+# INTERRUPT LISTENER (Porcupine-based)
 # ==============================================
 
 class PorcupineInterruptListener:
@@ -54,7 +54,7 @@ class PorcupineInterruptListener:
             raise RuntimeError("Porcupine not available")
 
         if not PICOVOICE_ACCESS_KEY:
-            raise RuntimeError("❌ Missing PICOVOICE_ACCESS_KEY in environment.")
+            raise RuntimeError(" Missing PICOVOICE_ACCESS_KEY in environment.")
 
         self.keywords = list(keywords)
 
@@ -103,11 +103,17 @@ class PorcupineInterruptListener:
 
     def _drain_buffer(self):
         """Read and discard any stale frames sitting in the OS audio buffer."""
+        import time
+        time.sleep(0.05)  # Small delay for stream to stabilize
         try:
             avail = self.stream.get_read_available()
+            drained = 0
             while avail >= self.pp.frame_length:
                 self.stream.read(self.pp.frame_length, exception_on_overflow=False)
+                drained += 1
                 avail = self.stream.get_read_available()
+                if drained > 100:  # Safety limit
+                    break
         except Exception:
             pass
 
@@ -122,14 +128,20 @@ class PorcupineInterruptListener:
                 pcm_data = self.stream.read(
                     self.pp.frame_length, exception_on_overflow=False
                 )
+                if len(pcm_data) < self.pp.frame_length * 2:
+                    continue  # Incomplete frame, skip
                 pcm = struct.unpack_from("h" * self.pp.frame_length, pcm_data)
 
                 keyword_index = self.pp.process(pcm)
                 if keyword_index >= 0:
-                    print(f"🛑 Interrupt detected: {self.keywords[keyword_index]}")
+                    print(f"Interrupt detected: {self.keywords[keyword_index]}")
                     self.interrupted.set()
                     break
-            except Exception:
+            except IOError:
+                # Buffer overflow - expected, just continue
+                continue
+            except Exception as e:
+                print(f"Interrupt listener error: {e}")
                 continue
 
     # ---- public API ------------------------------------------------------
@@ -143,7 +155,8 @@ class PorcupineInterruptListener:
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
         # Wait until buffer is drained and loop is actively reading
-        self._ready.wait(timeout=1.0)
+        if not self._ready.wait(timeout=2.0):
+            print("Interrupt listener slow to start")
 
     def stop(self):
         """Stop the listening loop and release the mic stream."""
@@ -167,7 +180,7 @@ class PorcupineInterruptListener:
 
 
 # ==============================================
-#  MAIN VOICE ASSISTANT CLASS
+# MAIN VOICE ASSISTANT CLASS
 # ==============================================
 
 class VoiceAssistant:
@@ -191,22 +204,22 @@ class VoiceAssistant:
                     keywords=tuple(self.interrupt_keywords)
                 )
             except Exception as e:
-                print(f"⚠️  Interrupt listener unavailable: {e}")
+                print(f"Interrupt listener unavailable: {e}")
 
         self.adjust_for_ambient_noise()
-        print("✅ Voice Assistant initialized")
+        print("Voice Assistant initialized")
 
     def adjust_for_ambient_noise(self, duration=1):
         """Calibrate the recogniser's energy threshold to ambient noise."""
-        print("🎤 Calibrating microphone...")
+        print("Calibrating microphone...")
         try:
             with self.microphone as source:
                 self.recognizer.adjust_for_ambient_noise(source, duration=duration)
         except Exception:
-            print("⚠️  Mic calibration failed")
+            print("Mic calibration failed")
 
     # ------------------------------------------------------------------
-    # LISTENING  (Speech-to-Text)
+    # LISTENING (Speech-to-Text)
     # ------------------------------------------------------------------
 
     def listen_for_speech(self, timeout=30, phrase_time_limit=15):
@@ -215,32 +228,32 @@ class VoiceAssistant:
 
         Returns
         -------
-        (text, False)  on success
-        (None, False)  on timeout / recognition failure
+        (text, False) on success
+        (None, False) on timeout / recognition failure
         """
         try:
             with self.microphone as source:
-                print("🎤 Listening...")
+                print("Listening...")
                 audio = self.recognizer.listen(
                     source, timeout=timeout, phrase_time_limit=phrase_time_limit
                 )
 
-            print("🔄 Recognizing...")
+            print("Recognizing...")
             text = self.recognizer.recognize_google(audio)
-            print(f"📝 You said: {text}")
+            print(f"You said: {text}")
             return text, False
 
         except sr.WaitTimeoutError:
             return None, False
         except sr.UnknownValueError:
-            print("⚠️  Could not understand speech")
+            print("Could not understand speech")
             return None, False
         except Exception as e:
-            print(f"❌ Speech error: {e}")
+            print(f"Speech error: {e}")
             return None, False
 
     # ------------------------------------------------------------------
-    # TTS GENERATION  (Text-to-Speech via Edge-TTS)
+    # TTS GENERATION (Text-to-Speech via Edge-TTS)
     # ------------------------------------------------------------------
 
     async def generate_speech_async(self, text, voice="en-US-AriaNeural"):
@@ -248,7 +261,7 @@ class VoiceAssistant:
             await edge_tts.Communicate(text, voice, rate="+17%").save(self.temp_audio_file)
             return True
         except Exception as e:
-            print(f"❌ TTS error: {e}")
+            print(f"TTS error: {e}")
             return False
 
     def generate_speech(self, text, voice="en-US-AriaNeural"):
@@ -259,39 +272,30 @@ class VoiceAssistant:
     # PLAYBACK WITH INTERRUPT
     # ------------------------------------------------------------------
 
-    def play_audio_with_interrupt(self):
+    def _play_audio_only(self):
         """
-        Play the temp audio file.  If Porcupine detects an interrupt keyword
-        during playback, stop immediately and return False.
-
-        Returns True if playback completed, False if interrupted.
+        Internal: Play the temp audio file, checking for interrupts.
+        Assumes listener is already started externally.
+        Returns True if completed, False if interrupted.
         """
         try:
             pygame.mixer.music.load(self.temp_audio_file)
         except Exception as e:
-            print(f"❌ Failed loading audio: {e}")
+            print(f"Failed loading audio: {e}")
             return False
-
-        # Start the persistent listener (drains buffer + waits until ready)
-        if self._listener:
-            try:
-                self._listener.start()
-            except Exception as e:
-                print(f"❌ Porcupine error: {e}")
 
         pygame.mixer.music.play()
 
         while pygame.mixer.music.get_busy():
             if self._listener and self._listener.was_interrupted():
                 pygame.mixer.music.stop()
-                pygame.mixer.music.unload()
-                self._listener.stop()
+                try:
+                    pygame.mixer.music.unload()
+                except Exception:
+                    pass
                 return False
 
-            self._clock.tick(50)
-
-        if self._listener:
-            self._listener.stop()
+            self._clock.tick(100)
 
         try:
             pygame.mixer.music.unload()
@@ -299,6 +303,27 @@ class VoiceAssistant:
             pass
 
         return True
+
+    def play_audio_with_interrupt(self):
+        """
+        Play the temp audio file. If Porcupine detects an interrupt keyword
+        during playback, stop immediately and return False.
+
+        Returns True if playback completed, False if interrupted.
+        """
+        # Start the persistent listener (drains buffer + waits until ready)
+        if self._listener:
+            try:
+                self._listener.start()
+            except Exception as e:
+                print(f"Porcupine error: {e}")
+
+        result = self._play_audio_only()
+
+        if self._listener:
+            self._listener.stop()
+
+        return result
 
     # ------------------------------------------------------------------
     # SPEAK (single utterance, with interrupt)
@@ -310,15 +335,15 @@ class VoiceAssistant:
 
         Returns
         -------
-        (True,  None)          — playback completed
+        (True, None) — playback completed
         (False, "interrupted") — user interrupted via keyword
-        (False, None)          — TTS generation failed
+        (False, None) — TTS generation failed
         """
-        print("🔊 Generating speech...")
+        print("Generating speech...")
         if not self.generate_speech(text, voice):
             return False, None
 
-        print("🔊 Speaking...")
+        print("Speaking...")
         completed = self.play_audio_with_interrupt()
 
         if completed:
@@ -334,6 +359,9 @@ class VoiceAssistant:
         Split *text* at sentence boundaries and speak each sentence.
         Stops immediately if the user interrupts any sentence.
 
+        The interrupt listener stays active throughout all sentences
+        to avoid missing interrupts between sentences.
+
         Parameters
         ----------
         on_sentence : callable, optional
@@ -341,19 +369,45 @@ class VoiceAssistant:
 
         Returns
         -------
-        (True,  None)          — all sentences spoken
+        (True, None) — all sentences spoken
         (False, "interrupted") — interrupted mid-way
         """
         sentences = re.split(r'(?<=[.!?])\s+', text)
         sentences = [s.strip() for s in sentences if s.strip()]
 
-        for s in sentences:
-            if on_sentence:
-                on_sentence(s)
-            done, reason = self.speak_with_interrupt(s)
-            if not done:
-                return False, reason
-        return True, None
+        if not sentences:
+            return True, None
+
+        # Start listener ONCE for entire playback session
+        if self._listener:
+            try:
+                self._listener.start()
+            except Exception as e:
+                print(f"Interrupt listener error: {e}")
+
+        try:
+            for s in sentences:
+                # Check if already interrupted before generating next sentence
+                if self._listener and self._listener.was_interrupted():
+                    return False, "interrupted"
+
+                if on_sentence:
+                    on_sentence(s)
+
+                print("Generating speech...")
+                if not self.generate_speech(s):
+                    return False, None
+
+                print("Speaking...")
+                completed = self._play_audio_only()
+                if not completed:
+                    return False, "interrupted"
+
+            return True, None
+        finally:
+            # Always stop listener when done
+            if self._listener:
+                self._listener.stop()
 
     # ------------------------------------------------------------------
     # CLEANUP

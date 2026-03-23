@@ -28,7 +28,7 @@ orders_collection.create_index("order_id", unique=True)
 
 
 # ========================================
-# 🔧 Helpers
+# Helpers
 # ========================================
 
 def generate_order_id() -> str:
@@ -105,7 +105,7 @@ def extract_order_id_from_query(query: str) -> str | None:
 
 
 # ========================================
-# 📦 Order CRUD Operations
+# Order CRUD Operations
 # ========================================
 
 def preview_order(username: str) -> dict:
@@ -480,7 +480,7 @@ def preview_cancel_order(username: str, order_id: str) -> dict:
 
 
 # ========================================
-# 🧩 Order Manager Agent (entry point)
+# Order Manager Agent (entry point)
 # ========================================
 
 def order_manager_agent(intent: str, query: str, username: str, order_id: str | None = None) -> dict:

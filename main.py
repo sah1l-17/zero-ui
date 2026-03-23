@@ -31,7 +31,7 @@ from profile_agent import profile_manager_agent
 from entity_extractor import extract_entities, resolve_intent_by_entities
 
 # ===============================
-# 🔧 Environment & Config
+# Environment & Config
 # ===============================
 
 load_dotenv()
@@ -41,7 +41,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 JWT_SECRET = os.getenv("JWT_SECRET")
 
 # ===============================
-# 🗄️ MongoDB Setup
+# MongoDB Setup
 # ===============================
 
 mongo_client = MongoClient(MONGO_URI)
@@ -50,13 +50,13 @@ users_collection = db["users"]
 users_collection.create_index("username", unique=True)
 
 # ===============================
-# 🤖 Groq Client
+# Groq Client
 # ===============================
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 # ===============================
-# 🔧 Cache Configuration
+# Cache Configuration
 # ===============================
 
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "embeddings_cache")
@@ -85,15 +85,15 @@ def load_cache():
 
 
 # ===============================
-# ⚡ Load Embeddings from Cache
+# Load Embeddings from Cache
 # ===============================
 
 if not os.path.exists(DF_CACHE_FILE):
-    print("❌ Embeddings not found!")
-    print("📝 Please run: python scripts/build_embeddings.py")
+    print("Embeddings not found!")
+    print("Please run: python scripts/build_embeddings.py")
     exit(1)
 
-print("⚡ Loading embeddings from cache...")
+print("Loading embeddings from cache...")
 (df, embeddings, category_embeddings, categories,
  index, pattern_embeddings, pattern_texts, labels) = load_cache()
 print("Total Products:", len(df))
@@ -185,7 +185,7 @@ def search_products(query, top_k=5):
         50
     )
 
-    SIMILARITY_THRESHOLD = 0.62  # adjust if needed
+    SIMILARITY_THRESHOLD = 0.62 # adjust if needed
 
     valid_results = []
 
@@ -231,7 +231,7 @@ def predict_intent(query, threshold=0.38):
 
 
 # ========================================
-# 🔐 Authentication Helpers
+# Authentication Helpers
 # ========================================
 
 def hash_pin(pin: str) -> str:
@@ -266,7 +266,7 @@ def verify_jwt_token(token: str) -> Optional[str]:
 
 
 # ========================================
-# 🤖 Groq LLM Helper
+# Groq LLM Helper
 # ========================================
 
 _BREVITY_DIRECTIVE = (
@@ -297,7 +297,7 @@ def groq_chat(system_prompt: str, user_message: str = "") -> str:
 
 
 # ========================================
-# 🗂️ Session Management
+# Session Management
 # ========================================
 
 sessions: dict = {}
@@ -340,7 +340,7 @@ def determine_auth_choice(message: str) -> Optional[str]:
 
 
 # ========================================
-# 🔑 Auth Conversation State Machine
+# Auth Conversation State Machine
 # ========================================
 
 def handle_auth_flow(session: dict, message: str) -> dict:
@@ -590,7 +590,7 @@ def handle_auth_flow(session: dict, message: str) -> dict:
 
 
 # ========================================
-# 🛍️ Authenticated Chat Handler
+# Authenticated Chat Handler
 # ========================================
 
 def groq_chat_with_history(system_prompt: str, history: list, user_message: str = "") -> str:
@@ -788,7 +788,7 @@ def _resolve_order_id_from_query(query: str, session: dict) -> str | None:
         for word, idx in _ORDINAL_MAP.items():
             if re.search(r'\b' + re.escape(word) + r'\b', q):
                 try:
-                    order = order_list[idx]  # supports negative index for "last"
+                    order = order_list[idx] # supports negative index for "last"
                     return order.get("order_id")
                 except IndexError:
                     pass
@@ -1027,7 +1027,7 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
         elif intent == "update_profile":
             if result_data.get("status") == "updated":
                 fields = result_data.get("updated_fields", {})
-                lines = [f"  - **{k.title()}:** {v}" for k, v in fields.items()]
+                lines = [f" - **{k.title()}:** {v}" for k, v in fields.items()]
                 reply = "\u2705 Profile updated successfully!\n\n" + "\n".join(lines)
                 if result_data.get("warnings"):
                     reply += "\n\n\u26a0\ufe0f Warnings: " + " ".join(result_data["warnings"])
@@ -1082,7 +1082,7 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
                 unit_price = item.get("unit_price", "N/A")
                 subtotal = item.get("subtotal", "N/A")
                 cart_lines.append(
-                    f"  {ci}. **{name}** — Qty: {qty}, Unit Price: {unit_price}, Subtotal: {subtotal}"
+                    f" {ci}. **{name}** — Qty: {qty}, Unit Price: {unit_price}, Subtotal: {subtotal}"
                 )
             cart_display = "\n".join(cart_lines) + f"\n\n**Cart Total: {cart_total}**"
         else:
@@ -1155,7 +1155,7 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
 
                 # Build programmatic order preview
                 items_text = "\n".join(
-                    f"  {i}. **{item['name']}** — Qty: {item['quantity']}, {item['unit_price']}"
+                    f" {i}. **{item['name']}** — Qty: {item['quantity']}, {item['unit_price']}"
                     for i, item in enumerate(preview_data.get("items", []), 1)
                 )
                 preview_text = (
@@ -1193,7 +1193,7 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
 
                 # Build programmatic cancel preview
                 items_text = "\n".join(
-                    f"  {i}. **{item['name']}** — Qty: {item['quantity']}, {item['unit_price']}"
+                    f" {i}. **{item['name']}** — Qty: {item['quantity']}, {item['unit_price']}"
                     for i, item in enumerate(preview_data.get("items", []), 1)
                 )
                 cancel_text = (
@@ -1257,7 +1257,7 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
 
                 # Build programmatic order details display
                 items_text = "\n".join(
-                    f"  {i}. **{item['name']}** — Qty: {item['quantity']}, {item['unit_price']} (Subtotal: {item['subtotal']})"
+                    f" {i}. **{item['name']}** — Qty: {item['quantity']}, {item['unit_price']} (Subtotal: {item['subtotal']})"
                     for i, item in enumerate(result_data.get("items", []), 1)
                 )
                 reply = (
@@ -1296,12 +1296,12 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
                     products = o.get("products", [])
                     product_str = ", ".join(products) if products else f"{o.get('item_count', 0)} item(s)"
                     order_lines.append(
-                        f"  {i}. **Order {o['order_id']}**\n"
-                        f"     - Products: {product_str}\n"
-                        f"     - Total: \u20b9{o.get('total_amount', 0):,.2f}\n"
-                        f"     - Status: {o.get('status', 'unknown').title()}\n"
-                        f"     - Date: {o.get('created_at', 'N/A')[:10]}\n"
-                        f"     - Shipping: {o.get('shipping_address', 'N/A')}"
+                        f" {i}. **Order {o['order_id']}**\n"
+                        f" - Products: {product_str}\n"
+                        f" - Total: \u20b9{o.get('total_amount', 0):,.2f}\n"
+                        f" - Status: {o.get('status', 'unknown').title()}\n"
+                        f" - Date: {o.get('created_at', 'N/A')[:10]}\n"
+                        f" - Shipping: {o.get('shipping_address', 'N/A')}"
                     )
                 reply = header + "\n".join(order_lines)
             else:
@@ -1364,12 +1364,12 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
 
 
 # ========================================
-# 🚀 Terminal Chatbot Loop
+# Terminal Chatbot Loop
 # ========================================
 
 def run_chatbot():
     """Interactive terminal chatbot with login/signup → intent routing → Groq replies."""
-    print("\n🚀 Chatbot Ready! (type 'exit' to quit)\n")
+    print("\n Chatbot Ready! (type 'exit' to quit)\n")
 
     session = {
         "state": "greeting",
@@ -1398,14 +1398,14 @@ def run_chatbot():
         try:
             user_input = input("You: ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nBot: Goodbye! 👋")
+            print("\nBot: Goodbye! ")
             break
 
         if not user_input:
             continue
 
         if user_input.lower() == "exit":
-            print("Bot: Goodbye! 👋")
+            print("Bot: Goodbye! ")
             break
 
         # ── Authenticated: route through intent detection ──
@@ -1445,18 +1445,18 @@ def run_chatbot():
 
 
 # ========================================
-# 🎤 Voice Chatbot Loop
+# Voice Chatbot Loop
 # ========================================
 
 def _strip_markdown(text: str) -> str:
     """Remove markdown formatting for cleaner TTS output."""
-    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)   # **bold**
-    text = re.sub(r'\*(.+?)\*', r'\1', text)        # *italic*
-    text = re.sub(r'__(.+?)__', r'\1', text)        # __bold__
-    text = re.sub(r'_(.+?)_', r'\1', text)          # _italic_
-    text = re.sub(r'#+\s*', '', text)               # # headers
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text) # **bold**
+    text = re.sub(r'\*(.+?)\*', r'\1', text) # *italic*
+    text = re.sub(r'__(.+?)__', r'\1', text) # __bold__
+    text = re.sub(r'_(.+?)_', r'\1', text) # _italic_
+    text = re.sub(r'#+\s*', '', text) # # headers
     text = re.sub(r'\[(.+?)\]\(.+?\)', r'\1', text) # [link](url)
-    text = re.sub(r'`(.+?)`', r'\1', text)          # `code`
+    text = re.sub(r'`(.+?)`', r'\1', text) # `code`
     return text.strip()
 
 
@@ -1466,7 +1466,7 @@ def run_voice_chatbot():
     from ui_server import AssistantUIServer
     from ui_state import AssistantUIStateStore
 
-    print("\n🎤 Voice Chatbot Starting...\n")
+    print("\n Voice Chatbot Starting...\n")
 
     # ── Start UI server for frontend ──
     ui_port = int(os.getenv("UI_PORT", "8000"))
@@ -1505,7 +1505,7 @@ def run_voice_chatbot():
             )
             ui_state.set(speaking=False)
             if not done:
-                print("⚠️ Speech interrupted by user")
+                print("Speech interrupted by user")
 
     def listen():
         """Listen for speech and return text, or None."""
@@ -1574,11 +1574,11 @@ def run_voice_chatbot():
             say(result["reply"])
 
     except KeyboardInterrupt:
-        print("\n🛑 Interrupted by user")
+        print("\n Interrupted by user")
     finally:
         va.cleanup()
         ui_server.stop()
-        print("🧹 Voice session ended.")
+        print("Voice session ended.")
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ===============================
-# 🔧 Cache Configuration
+# Cache Configuration
 # ===============================
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -66,25 +66,25 @@ def save_cache(excel_path, intents_path, df, embeddings, category_embeddings,
     with open(METADATA_FILE, "w") as f:
         json.dump(metadata, f)
 
-    print("✅ Embeddings cached to:", CACHE_DIR)
+    print("Embeddings cached to:", CACHE_DIR)
 
 
 def build_embeddings():
     """Build all embeddings from scratch."""
     
     # ===============================
-    # 1️⃣ File Paths
+    # 1. File Paths
     # ===============================
     
     file_path = os.path.join(ROOT_DIR, "Products Data.xlsx")
     intents_path = os.path.join(ROOT_DIR, "intents.json")
     
-    print("🔄 Building embeddings from source data...")
-    print(f"📊 Excel file: {file_path}")
-    print(f"📝 Intents file: {intents_path}")
+    print("Building embeddings from source data...")
+    print(f"Excel file: {file_path}")
+    print(f"Intents file: {intents_path}")
     
     # ===============================
-    # 2️⃣ Load Excel (All Sheets)
+    # 2. Load Excel (All Sheets)
     # ===============================
     
     all_sheets = pd.read_excel(file_path, sheet_name=None)
@@ -108,14 +108,14 @@ def build_embeddings():
     print("Total Products (Raw):", len(df))
     
     # ===============================
-    # 3️⃣ Clean & Normalize
+    # 3. Clean & Normalize
     # ===============================
     
     df = df.fillna("")
     
     # Columns already normalized per-sheet; drop any remaining dupes
     df = df.loc[:, ~df.columns.duplicated()]
-    df = df.map(lambda x: str(x).strip().lower())
+    df = df.applymap(lambda x: str(x).strip().lower())
     
     if "product type" not in df.columns:
         raise ValueError("Column 'product type' not found in Excel.")
@@ -127,7 +127,7 @@ def build_embeddings():
     print("Total Products (After Cleaning):", len(df))
     
     # ===============================
-    # 4️⃣ Build Embedding Text
+    # 4. Build Embedding Text
     # ===============================
     
     def build_embedding_text(row):
@@ -140,13 +140,13 @@ def build_embeddings():
     corpus = df.apply(build_embedding_text, axis=1).tolist()
     
     # ===============================
-    # 5️⃣ Create Product Embeddings
+    # 5. Create Product Embeddings
     # ===============================
     
-    print("📦 Loading BGE model for product embeddings...")
+    print("Loading BGE model for product embeddings...")
     bge_model = SentenceTransformer("BAAI/bge-base-en-v1.5")
     
-    print("🔢 Creating product embeddings...")
+    print("Creating product embeddings...")
     embeddings = bge_model.encode(
         corpus,
         batch_size=32,
@@ -162,10 +162,10 @@ def build_embeddings():
     print("FAISS index created with", index.ntotal, "products")
     
     # ===============================
-    # 6️⃣ Category Embeddings
+    # 6. Category Embeddings
     # ===============================
-    
-    print("🏷️  Creating category embeddings...")
+
+    print("Creating category embeddings...")
     categories = df["product type"].unique().tolist()
     
     category_texts = []
@@ -181,10 +181,10 @@ def build_embeddings():
     )
     
     # ===============================
-    # 7️⃣ Intent Pattern Embeddings
+    # 7. Intent Pattern Embeddings
     # ===============================
     
-    print("🎯 Creating intent pattern embeddings...")
+    print("Creating intent pattern embeddings...")
     with open(intents_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     
@@ -197,22 +197,22 @@ def build_embeddings():
             pattern_texts.append(pattern)
             labels.append(tag)
     
-    print("📦 Loading MiniLM model for intent embeddings...")
+    print("Loading MiniLM model for intent embeddings...")
     minilm_model = SentenceTransformer("all-MiniLM-L6-v2")
     pattern_embeddings = minilm_model.encode(pattern_texts)
     
     # ===============================
-    # 💾 Save Cache
+    # Save Cache
     # ===============================
     
-    print("💾 Saving all embeddings to cache...")
+    print("Saving all embeddings to cache...")
     save_cache(file_path, intents_path, df, embeddings, category_embeddings,
                categories, index, pattern_embeddings, pattern_texts, labels)
     
-    print("\n✨ Embedding creation complete!")
-    print(f"📊 Products indexed: {len(df)}")
-    print(f"🏷️  Categories: {len(categories)}")
-    print(f"🎯 Intent patterns: {len(pattern_texts)}")
+    print("\nEmbedding creation complete!")
+    print(f"Products indexed: {len(df)}")
+    print(f"Categories: {len(categories)}")
+    print(f"Intent patterns: {len(pattern_texts)}")
 
 
 if __name__ == "__main__":
