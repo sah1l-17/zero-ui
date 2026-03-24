@@ -355,29 +355,29 @@ def handle_auth_flow(session: dict, message: str) -> dict:
             session["flow"] = "signup"
             session["state"] = "signup_name"
             reply = groq_chat(
-                "You are a friendly e-commerce shopping assistant. The user wants to create a new account. "
-                "Welcome them and then ask ONLY for their FULL NAME. "
+                "You are a friendly voice-based e-commerce shopping assistant helping a visually impaired user. "
+                "The user wants to create a new account. Welcome them warmly and ask them to STATE their FULL NAME. "
                 "Do NOT ask for username, PIN, or any other detail yet. "
-                "Keep it to 1-2 sentences. Ask only ONE question."
+                "Keep it to 1-2 sentences. Ask only ONE question. Use voice-friendly language like 'please say' or 'tell me' instead of 'type' or 'enter'."
             )
             return {"reply": reply}
         elif choice == "login":
             session["flow"] = "login"
             session["state"] = "login_username"
             reply = groq_chat(
-                "You are a friendly e-commerce shopping assistant. The user wants to log in. "
-                "Welcome them back and ask ONLY for their USERNAME. "
+                "You are a friendly voice-based e-commerce shopping assistant helping a visually impaired user. "
+                "The user wants to log in. Welcome them back and ask them to STATE their USERNAME. "
                 "Do NOT ask for PIN or any other detail yet. "
-                "Keep it to 1-2 sentences. Ask only ONE question."
+                "Keep it to 1-2 sentences. Ask only ONE question. Use voice-friendly language like 'please say' or 'tell me' instead of 'type' or 'enter'."
             )
             return {"reply": reply}
         else:
             reply = groq_chat(
-                "You are a friendly e-commerce shopping assistant chatbot. "
+                "You are a friendly voice-based e-commerce shopping assistant helping a visually impaired user. "
                 "The user has just connected for the first time. "
                 "Greet them warmly and ask whether they would like to login or signup. "
                 "Keep it brief, professional, and friendly. Ask only ONE question. "
-                "Do not use bullet points or numbered lists."
+                "Do not use bullet points or numbered lists. Use voice-friendly language like 'please say' instead of 'type' or 'click'."
             )
             session["state"] = "choosing"
             return {"reply": reply}
@@ -389,26 +389,26 @@ def handle_auth_flow(session: dict, message: str) -> dict:
             session["flow"] = "signup"
             session["state"] = "signup_name"
             reply = groq_chat(
-                "You are a friendly shopping assistant. The user chose to sign up. "
-                "Ask ONLY for their FULL NAME. Do NOT ask for username, PIN, or anything else. "
-                "Keep it to 1-2 sentences."
+                "You are a friendly voice-based shopping assistant helping a visually impaired user. The user chose to sign up. "
+                "Ask them to STATE their FULL NAME. Do NOT ask for username, PIN, or anything else. "
+                "Keep it to 1-2 sentences. Use voice-friendly language like 'please say' or 'tell me' instead of 'type' or 'enter'."
             )
             return {"reply": reply}
         elif choice == "login":
             session["flow"] = "login"
             session["state"] = "login_username"
             reply = groq_chat(
-                "You are a friendly shopping assistant. The user chose to log in. "
-                "Ask ONLY for their USERNAME. Do NOT ask for PIN or anything else. "
-                "Keep it to 1-2 sentences."
+                "You are a friendly voice-based shopping assistant helping a visually impaired user. The user chose to log in. "
+                "Ask them to STATE their USERNAME. Do NOT ask for PIN or anything else. "
+                "Keep it to 1-2 sentences. Use voice-friendly language like 'please say' or 'tell me' instead of 'type' or 'enter'."
             )
             return {"reply": reply}
         else:
             reply = groq_chat(
-                "You are a friendly shopping assistant. The user said something "
+                "You are a friendly voice-based shopping assistant helping a visually impaired user. The user said something "
                 "but you couldn't tell if they want to login or signup. "
                 "Politely ask them again whether they'd like to login or signup. "
-                "Be brief. Ask only ONE question.",
+                "Be brief. Ask only ONE question. Use voice-friendly language like 'please say' instead of 'type' or 'click'.",
                 user_message=message,
             )
             return {"reply": reply}
@@ -418,16 +418,16 @@ def handle_auth_flow(session: dict, message: str) -> dict:
         name = message.strip()
         if len(name) < 2:
             reply = groq_chat(
-                "You are helping a user sign up. The name they gave seems too short. "
-                "Politely ask them to provide their full name again. Ask only ONE question."
+                "You are a voice-based assistant helping a visually impaired user sign up. The name they gave seems too short. "
+                "Politely ask them to say their full name again. Ask only ONE question. Use voice-friendly language."
             )
             return {"reply": reply}
         session["data"]["name"] = name
         session["state"] = "signup_username"
         reply = groq_chat(
-            f"The user's name is {name}. You are helping them sign up. "
-            "Acknowledge their name briefly, then ask ONLY for a UNIQUE USERNAME they'd like to use. "
-            "Do NOT ask for PIN, contact, address or anything else. Keep it to 1-2 sentences."
+            f"The user's name is {name}. You are a voice-based assistant helping a visually impaired user sign up. "
+            "Acknowledge their name briefly, then ask them to STATE a UNIQUE USERNAME they'd like to use. "
+            "Do NOT ask for PIN, contact, address or anything else. Keep it to 1-2 sentences. Use voice-friendly language like 'please say' or 'tell me'."
         )
         return {"reply": reply}
 
@@ -436,24 +436,24 @@ def handle_auth_flow(session: dict, message: str) -> dict:
         username = message.strip().lower()
         if len(username) < 3:
             reply = groq_chat(
-                "You are helping a user sign up. The username they chose is too short "
-                "(minimum 3 characters). Politely ask them to choose a longer username. "
-                "Ask only ONE question."
+                "You are a voice-based assistant helping a visually impaired user sign up. The username they chose is too short "
+                "(minimum 3 characters). Politely ask them to say a longer username. "
+                "Ask only ONE question. Use voice-friendly language."
             )
             return {"reply": reply}
         if users_collection.find_one({"username": username}):
             reply = groq_chat(
-                f"You are helping a user sign up. The username '{username}' is already taken. "
-                "Politely inform them and ask them to choose a different username. "
-                "Ask only ONE question."
+                f"You are a voice-based assistant helping a visually impaired user sign up. The username '{username}' is already taken. "
+                "Politely inform them and ask them to say a different username. "
+                "Ask only ONE question. Use voice-friendly language."
             )
             return {"reply": reply}
         session["data"]["username"] = username
         session["state"] = "signup_pin"
         reply = groq_chat(
-            f"Username '{username}' is available! Now ask the user to create a 4-DIGIT NUMERIC PIN "
-            "(exactly 4 digits, numbers only, e.g. 1234). This PIN will be their password. "
-            "Do NOT ask for contact, address, or anything else. Keep it to 1-2 sentences."
+            f"Username '{username}' is available! You are a voice-based assistant helping a visually impaired user. "
+            "Now ask the user to SAY a 4-DIGIT NUMERIC PIN (exactly 4 digits, numbers only, for example one two three four). "
+            "This PIN will be their password. Do NOT ask for contact, address, or anything else. Keep it to 1-2 sentences. Use voice-friendly language."
         )
         return {"reply": reply}
 
@@ -462,16 +462,17 @@ def handle_auth_flow(session: dict, message: str) -> dict:
         pin = message.strip()
         if not re.match(r"^\d{4}$", pin):
             reply = groq_chat(
-                "You are helping a user sign up. The PIN they entered is invalid. "
-                "It must be exactly 4 numeric digits (e.g. 1234). "
-                "Politely ask them to try again. Ask only ONE question."
+                "You are a voice-based assistant helping a visually impaired user sign up. The PIN they provided is invalid. "
+                "It must be exactly 4 numeric digits (for example, one two three four). "
+                "Politely ask them to say their PIN again. Ask only ONE question. Use voice-friendly language."
             )
             return {"reply": reply}
         session["data"]["pin"] = pin
         session["state"] = "signup_contact"
         reply = groq_chat(
-            "PIN accepted! Now ask the user ONLY for their CONTACT NUMBER (phone number). "
-            "Do NOT ask for address or anything else. Keep it to 1-2 sentences."
+            "PIN accepted! You are a voice-based assistant helping a visually impaired user. "
+            "Now ask the user to STATE their CONTACT NUMBER (phone number). "
+            "Do NOT ask for address or anything else. Keep it to 1-2 sentences. Use voice-friendly language like 'please say' or 'tell me'."
         )
         return {"reply": reply}
 
@@ -480,15 +481,16 @@ def handle_auth_flow(session: dict, message: str) -> dict:
         contact = message.strip()
         if len(contact) < 7:
             reply = groq_chat(
-                "You are helping a user sign up. The contact number seems too short. "
-                "Politely ask them to provide a valid phone number. Ask only ONE question."
+                "You are a voice-based assistant helping a visually impaired user sign up. The contact number seems too short. "
+                "Politely ask them to say a valid phone number. Ask only ONE question. Use voice-friendly language."
             )
             return {"reply": reply}
         session["data"]["phone"] = contact
         session["state"] = "signup_address"
         reply = groq_chat(
-            "Contact saved! Now ask the user ONLY for their DELIVERY ADDRESS. "
-            "This is the last step of signup. Keep it to 1-2 sentences."
+            "Contact saved! You are a voice-based assistant helping a visually impaired user. "
+            "Now ask the user to STATE their DELIVERY ADDRESS. "
+            "This is the last step of signup. Keep it to 1-2 sentences. Use voice-friendly language like 'please say' or 'tell me'."
         )
         return {"reply": reply}
 
@@ -497,9 +499,9 @@ def handle_auth_flow(session: dict, message: str) -> dict:
         address = message.strip()
         if len(address) < 5:
             reply = groq_chat(
-                "You are helping a user sign up. The address seems too short. "
-                "Politely ask them to provide a complete delivery address. "
-                "Ask only ONE question."
+                "You are a voice-based assistant helping a visually impaired user sign up. The address seems too short. "
+                "Politely ask them to say their complete delivery address. "
+                "Ask only ONE question. Use voice-friendly language."
             )
             return {"reply": reply}
         session["data"]["address"] = address
@@ -517,8 +519,8 @@ def handle_auth_flow(session: dict, message: str) -> dict:
             users_collection.insert_one(user_doc)
         except Exception as e:
             reply = groq_chat(
-                f"You are helping a user sign up but an error occurred: {e}. "
-                "Apologize and ask them to try again."
+                f"You are a voice-based assistant helping a visually impaired user sign up but an error occurred: {e}. "
+                "Apologize and ask them to try again. Use voice-friendly language."
             )
             return {"reply": reply}
 
@@ -530,9 +532,9 @@ def handle_auth_flow(session: dict, message: str) -> dict:
         session["state"] = "authenticated"
 
         reply = groq_chat(
-            f"You are a friendly shopping assistant. The user '{session['data']['name']}' "
+            f"You are a friendly voice-based shopping assistant helping a visually impaired user. The user '{session['data']['name']}' "
             f"has successfully signed up with username '{session['data']['username']}'. "
-            "Welcome them briefly and ask what they'd like to do. One sentence only."
+            "Welcome them briefly and ask what they'd like to do. One sentence only. Use voice-friendly language."
         )
         return {"reply": reply, "token": token, "authenticated": True}
 
@@ -542,8 +544,8 @@ def handle_auth_flow(session: dict, message: str) -> dict:
         session["data"]["username"] = username
         session["state"] = "login_pin"
         reply = groq_chat(
-            f"The user provided username '{username}'. Now ask ONLY for their 4-DIGIT PIN. "
-            "Do NOT ask for anything else. Keep it to 1-2 sentences."
+            f"You are a voice-based assistant helping a visually impaired user log in. The user provided username '{username}'. "
+            "Now ask them to SAY their 4-DIGIT PIN. Do NOT ask for anything else. Keep it to 1-2 sentences. Use voice-friendly language like 'please say' or 'tell me'."
         )
         return {"reply": reply}
 
@@ -557,17 +559,17 @@ def handle_auth_flow(session: dict, message: str) -> dict:
             session["state"] = "choosing"
             session["data"] = {}
             reply = groq_chat(
-                f"You are helping a user log in. The username '{username}' was not found. "
-                "Politely inform them and ask whether they'd like to try a different "
-                "username or sign up for a new account instead. Ask only ONE question."
+                f"You are a voice-based assistant helping a visually impaired user log in. The username '{username}' was not found. "
+                "Politely inform them and ask whether they'd like to say a different "
+                "username or sign up for a new account instead. Ask only ONE question. Use voice-friendly language."
             )
             return {"reply": reply}
 
         if not verify_pin(pin, user["pin"]):
             reply = groq_chat(
-                "You are helping a user log in. The PIN they entered is incorrect. "
-                "Politely let them know and ask them to try their PIN again. "
-                "Ask only ONE question."
+                "You are a voice-based assistant helping a visually impaired user log in. The PIN they provided is incorrect. "
+                "Politely let them know and ask them to say their PIN again. "
+                "Ask only ONE question. Use voice-friendly language."
             )
             return {"reply": reply}
 
@@ -579,9 +581,9 @@ def handle_auth_flow(session: dict, message: str) -> dict:
         session["state"] = "authenticated"
 
         reply = groq_chat(
-            f"You are a friendly shopping assistant. The user '{user['name']}' "
+            f"You are a friendly voice-based shopping assistant helping a visually impaired user. The user '{user['name']}' "
             "has successfully logged in. Welcome them back briefly and ask what they'd like to do. "
-            "One sentence only."
+            "One sentence only. Use voice-friendly language."
         )
         return {"reply": reply, "token": token, "authenticated": True}
 
@@ -1163,7 +1165,7 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
                     f"{items_text}\n\n"
                     f"**Total:** {preview_data.get('total_amount', 'N/A')}\n"
                     f"**Shipping to:** {preview_data.get('shipping_address', 'N/A')}\n\n"
-                    f"Would you like to confirm this order? Type **yes** to place or **no** to cancel."
+                    f"Would you like to confirm this order? Say **yes** to place or **no** to cancel."
                 )
                 reply = preview_text
                 history.append({"role": "user", "content": message})
@@ -1202,7 +1204,7 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
                     f"**Total:** {preview_data.get('total_amount', 'N/A')}\n"
                     f"**Order Date:** {preview_data.get('order_date', 'N/A')}\n"
                     f"**Shipping to:** {preview_data.get('shipping_address', 'N/A')}\n\n"
-                    f"Type **yes** to confirm cancellation or **no** to keep the order."
+                    f"Say **yes** to confirm cancellation or **no** to keep the order."
                 )
                 reply = cancel_text
                 history.append({"role": "user", "content": message})
@@ -1369,7 +1371,7 @@ def handle_authenticated_chat(session: dict, username: str, message: str) -> dic
 
 def run_chatbot():
     """Interactive terminal chatbot with login/signup → intent routing → Groq replies."""
-    print("\n Chatbot Ready! (type 'exit' to quit)\n")
+    print("\n Chatbot Ready! (say 'exit' to quit)\n")
 
     session = {
         "state": "greeting",
