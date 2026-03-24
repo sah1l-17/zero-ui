@@ -413,6 +413,87 @@ class VoiceAssistant:
     # CLEANUP
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # WAKE WORD DETECTION (for sleep mode)
+    # ------------------------------------------------------------------
+
+    def wait_for_wake_word(self, timeout=None):
+        """
+        Block until a wake word (computer/terminator) is detected.
+        Used to wake the assistant from sleep mode.
+
+        Parameters
+        ----------
+        timeout : float, optional
+            Maximum seconds to wait. None = wait forever.
+
+        Returns
+        -------
+        str  — the detected wake word
+        None — if Porcupine is not available, timeout, or error occurred
+        """
+        if not PV_AVAILABLE:
+            print("⚠️  Porcupine not available — cannot detect wake word")
+            return None
+
+        if not PICOVOICE_ACCESS_KEY:
+            print("⚠️  Missing PICOVOICE_ACCESS_KEY — cannot detect wake word")
+            return None
+
+        print("💤 Sleeping... Say 'Computer' or 'Terminator' to wake me up")
+
+        try:
+            # Create a temporary Porcupine instance for wake word detection
+            pp = pvporcupine.create(
+                access_key=PICOVOICE_ACCESS_KEY,
+                keywords=self.interrupt_keywords,
+            )
+
+            pa = pyaudio.PyAudio()
+            stream = pa.open(
+                rate=pp.sample_rate,
+                channels=1,
+                format=pyaudio.paInt16,
+                input=True,
+                frames_per_buffer=pp.frame_length,
+            )
+
+            detected_word = None
+            import time
+            start_time = time.time()
+
+            try:
+                while True:
+                    # Check timeout
+                    if timeout and (time.time() - start_time) > timeout:
+                        print("⏰ Wake word timeout")
+                        break
+
+                    pcm_data = stream.read(pp.frame_length, exception_on_overflow=False)
+                    pcm = struct.unpack_from("h" * pp.frame_length, pcm_data)
+
+                    keyword_index = pp.process(pcm)
+                    if keyword_index >= 0:
+                        detected_word = self.interrupt_keywords[keyword_index]
+                        print(f"🔔 Wake word detected: {detected_word}")
+                        break
+
+            finally:
+                stream.stop_stream()
+                stream.close()
+                pa.terminate()
+                pp.delete()
+
+            return detected_word
+
+        except Exception as e:
+            print(f"❌ Wake word detection error: {e}")
+            return None
+
+    # ------------------------------------------------------------------
+    # CLEANUP
+    # ------------------------------------------------------------------
+
     def cleanup(self):
         """Release audio resources and remove temp files."""
         if self._listener:

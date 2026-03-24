@@ -1510,9 +1510,9 @@ def run_voice_chatbot():
                 print("Speech interrupted by user")
 
     def listen():
-        """Listen for speech and return text, or None."""
+        """Listen for speech and return text, or None after 5s silence."""
         ui_state.set(text="Listening…", speaking=False)
-        text, _ = va.listen_for_speech()
+        text, _ = va.listen_for_speech(timeout=5, phrase_time_limit=15)
         if text:
             print(f"You: {text}")
         return text
@@ -1528,13 +1528,31 @@ def run_voice_chatbot():
     session["state"] = "choosing"
     say(greeting)
 
+    # Track consecutive failed listen attempts for sleep mode
+    failed_listen_count = 0
+    MAX_FAILED_ATTEMPTS = 2
+
     try:
         while True:
             user_input = listen()
 
             if not user_input:
-                say("I didn't catch that. Could you please repeat?")
-                continue
+                failed_listen_count += 1
+
+                if failed_listen_count >= MAX_FAILED_ATTEMPTS:
+                    # Enter sleep mode after 2 failed attempts
+                    say("Going to sleep. Say 'Computer' or 'Terminator' to wake me up.")
+                    wake_word = va.wait_for_wake_word()
+                    if wake_word:
+                        failed_listen_count = 0
+                        say("I'm awake! How can I help you?")
+                    continue
+                else:
+                    say("I didn't catch that. Could you please repeat?")
+                    continue
+
+            # Reset counter on successful listen
+            failed_listen_count = 0
 
             if user_input.lower() in ("exit", "quit", "bye", "goodbye"):
                 say("Goodbye! Have a great day!")
